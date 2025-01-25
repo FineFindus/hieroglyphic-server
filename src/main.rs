@@ -38,7 +38,7 @@ async fn main(#[shuttle_runtime::Secrets] secrets: SecretStore) -> shuttle_axum:
             "/",
             get(|| async { Redirect::to("https://github.com/FineFindus/Hieroglyphic") }),
         )
-        .route("/v1/upload/:label", post(upload_data))
+        .route("/v1/upload/{:label}", post(upload_data))
         .with_state(state);
 
     Ok(router.into())
