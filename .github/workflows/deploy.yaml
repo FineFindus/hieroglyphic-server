@@ -15,3 +15,5 @@ jobs:
         uses: shuttle-hq/deploy-action@main
         with:
           deploy-key: ${{ secrets.SHUTTLE_API_KEY }}
+          secrets: |
+            MONGODB_URI = '${{ secrets.MONGODB_URI }}'

@@ -7,20 +7,32 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use mongodb::bson::{self, doc, oid::ObjectId};
+use shuttle_runtime::SecretStore;
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+struct Symbol {
+    _id: ObjectId,
+    label: String,
+    samples: Vec<detexify::StrokeSample>,
+}
 
 #[derive(Debug, Clone)]
 struct ServerState {
-    pool: sqlx::PgPool,
+    database: mongodb::Database,
 }
 
 #[shuttle_runtime::main]
-async fn main(#[shuttle_shared_db::Postgres] pool: sqlx::PgPool) -> shuttle_axum::ShuttleAxum {
-    sqlx::migrate!()
-        .run(&pool)
+async fn main(#[shuttle_runtime::Secrets] secrets: SecretStore) -> shuttle_axum::ShuttleAxum {
+    let client_uri = secrets
+        .get("MONGODB_URI")
+        .expect("`MONGODB_URI` should be set as a secret");
+    let client = mongodb::Client::with_uri_str(&client_uri)
         .await
-        .expect("Failed to run migrations");
+        .expect("Failed to connect to database");
+    let database = client.database("hieroglyphic-prod");
 
-    let state = ServerState { pool };
+    let state = ServerState { database };
     let router = Router::new()
         .route(
             "/",
@@ -44,39 +56,29 @@ async fn upload_data(
         return StatusCode::BAD_REQUEST;
     }
 
-    // validate and prepare strokes
-    let Some(sample) = detexify::StrokeSample::new(strokes) else {
+    // validate, prepare and encode strokes
+    let Some(sample) =
+        detexify::StrokeSample::new(strokes).map(|sample| bson::to_bson(&sample).ok())
+    else {
         tracing::error!("Invalid strokes");
         return StatusCode::BAD_REQUEST;
     };
 
-    // only insert name into db if it doesn't exist already
-    let Ok((id, label)): Result<(i32, String), sqlx::Error> = sqlx::query_as(
-        "INSERT INTO labels (name) VALUES ($1)
-     ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-     RETURNING id, name",
-    )
-    .bind(&label)
-    .fetch_one(&state.pool)
-    .await
-    else {
-        tracing::error!("Failed to insert label '{}' into db", &label);
-        return StatusCode::INTERNAL_SERVER_ERROR;
-    };
-
-    // add strokes into db with relation to label
-    let Ok(json) = serde_json::to_value(sample) else {
-        tracing::error!("Failed to convert data to json");
-        return StatusCode::INTERNAL_SERVER_ERROR;
-    };
-
-    if let Err(err) = sqlx::query("INSERT INTO samples (label_id, strokes) VALUES ($1, $2)")
-        .bind(id)
-        .bind(&json)
-        .execute(&state.pool)
-        .await
-    {
-        tracing::error!("Failed to insert strokes for '{}' into db: {}", &label, err);
+    let insert_res = state
+        .database
+        .collection::<Symbol>("symbols")
+        .update_one(
+            doc! {
+                "label": &label,
+            },
+            doc! {
+                "$push": doc! { "samples": sample},
+            },
+        )
+        .upsert(true)
+        .await;
+    if let Err(err) = insert_res {
+        tracing::error!("Failed to insert label '{}' into db: {}", &label, err);
         return StatusCode::INTERNAL_SERVER_ERROR;
     }
 
