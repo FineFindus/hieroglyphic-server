@@ -11,8 +11,8 @@ shuttle-axum = "0.56"
 shuttle-runtime = "0.56"
 shuttle-shared-db = "0.56"
 mongodb = "3.2"
-tokio = "1.28.2"
-tracing = "0.1.40"
+tokio = "1.46"
+tracing = "0.1"
 # TODO: this is an old version of the classifier used by Hieroglyphic,
 # migrate to the newer one if the two diverge
 detexify = { git = "https://github.com/FineFindus/detexify-rust.git", rev = "311002feb0519f483ef1f9cc8206648286128ff5" }
