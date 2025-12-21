@@ -8,7 +8,6 @@ use axum::{
     Json, Router,
 };
 use mongodb::bson::{self, doc, oid::ObjectId};
-use shuttle_runtime::SecretStore;
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 struct Symbol {
@@ -22,15 +21,16 @@ struct ServerState {
     database: mongodb::Database,
 }
 
-#[shuttle_runtime::main]
-async fn main(#[shuttle_runtime::Secrets] secrets: SecretStore) -> shuttle_axum::ShuttleAxum {
-    let client_uri = secrets
-        .get("MONGODB_URI")
-        .expect("`MONGODB_URI` should be set as a secret");
+#[tokio::main]
+async fn main() {
+    tracing_subscriber::fmt::init();
+
+    let client_uri = std::env::var("MONGODB_URI").expect("`MONGODB_URI` should be set as a secret");
     let client = mongodb::Client::with_uri_str(&client_uri)
         .await
         .expect("Failed to connect to database");
     let database = client.database("hieroglyphic-prod");
+    tracing::info!("sucessfully connectiong to db: {}", database.name());
 
     let state = ServerState { database };
     let router = Router::new()
@@ -39,9 +39,12 @@ async fn main(#[shuttle_runtime::Secrets] secrets: SecretStore) -> shuttle_axum:
             get(|| async { Redirect::to("https://github.com/FineFindus/Hieroglyphic") }),
         )
         .route("/v1/upload/{:label}", post(upload_data))
+        .route("/v1/batch-upload/", post(upload_data))
         .with_state(state);
 
-    Ok(router.into())
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    tracing::info!("listening on {}", listener.local_addr().unwrap());
+    axum::serve(listener, router).await.unwrap();
 }
 
 async fn upload_data(

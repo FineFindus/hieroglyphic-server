@@ -5,4 +5,4 @@ The server allows users to (optionally) upload and contribute stroke data for sy
 
 ### Architecture
 
-The server is built on [shuttle.rs](https://shuttle.rs/), a managed Rust backend provider, the contributed data is stored in a PostgreSQL database.
+The server uses [`axum`](https://github.com/tokio-rs/axum), the contributed data is stored in a MongoDB instance.
