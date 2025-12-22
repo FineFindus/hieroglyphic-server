@@ -1,11 +1,11 @@
 use std::{collections::HashSet, sync::OnceLock};
 
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::Redirect,
     routing::{get, post},
-    Json, Router,
 };
 use mongodb::bson::{self, doc, oid::ObjectId};
 
@@ -25,7 +25,13 @@ struct ServerState {
 async fn main() {
     tracing_subscriber::fmt::init();
 
+    let port = std::env::var("PORT")
+        .as_deref()
+        .unwrap_or("8080")
+        .parse::<u16>()
+        .unwrap();
     let client_uri = std::env::var("MONGODB_URI").expect("`MONGODB_URI` should be set as a secret");
+
     let client = mongodb::Client::with_uri_str(&client_uri)
         .await
         .expect("Failed to connect to database");
@@ -42,8 +48,10 @@ async fn main() {
         .route("/v1/batch-upload/", post(upload_data))
         .with_state(state);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    tracing::info!("listening on {}", listener.local_addr().unwrap());
+    let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{}", port))
+        .await
+        .unwrap();
+    tracing::info!("listening on: http://127.0.0.1:{}", port);
     axum::serve(listener, router).await.unwrap();
 }
 
