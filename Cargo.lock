@@ -639,7 +639,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hieroglyphic"
+name = "hieroglyphic-server"
 version = "0.1.0"
 dependencies = [
  "axum",
