@@ -45,7 +45,6 @@ async fn main() {
             get(|| async { Redirect::to("https://github.com/FineFindus/Hieroglyphic") }),
         )
         .route("/v1/upload/{:label}", post(upload_data))
-        .route("/v1/batch-upload/", post(upload_data))
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{}", port))
