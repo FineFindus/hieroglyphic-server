@@ -1,4 +1,4 @@
-FROM rust:1.92.0-alpine3.23 as builder
+FROM rust:1.95.0-alpine3.22 as builder
 WORKDIR /build
 COPY . .
 ENV RUSTFLAGS "-C target-cpu=native"
